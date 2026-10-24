@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="amarillo">#F6C90E</color>
+    <color name="amarillo_oscuro">#E0B400</color>
+    <color name="amarillo_claro">#FFF3B0</color>
+    <color name="cafe">#2B2100</color>
+    <color name="cafe_medio">#5C4700</color>
+    <color name="rojo">#A32D2D</color>
+
+    <style name="LauncherTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@color/amarillo</item>
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:colorAccent">@color/cafe</item>
+    </style>
+</resources>
