@@ -72,6 +72,7 @@ class MainActivity : Activity() {
         window.setBackgroundDrawable(null)
         setContentView(buildScreen())
         WifiGuardService.start(this)
+        com.owari.launcher.adblock.AdBlockVpnService.startIfEnabled(this)
         registerReceiver(packagesChanged, IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
             addAction(Intent.ACTION_PACKAGE_REMOVED)

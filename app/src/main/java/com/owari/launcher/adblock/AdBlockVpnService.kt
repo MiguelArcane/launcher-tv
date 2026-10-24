@@ -49,10 +49,18 @@ class AdBlockVpnService : VpnService() {
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ON, on).apply()
         }
 
-        /** Arranca solo si está prendido y Android ya dio permiso para la VPN. */
+        /**
+         * Arranca solo si está prendido, no está corriendo ya y Android dio permiso para la VPN.
+         * Se llama seguido (inicio, ADMIN, vigilante de Wi-Fi) para que vuelva solo si Android lo detiene.
+         */
         fun startIfEnabled(context: Context) {
-            if (!isEnabled(context) || prepare(context) != null) return
-            context.startForegroundService(Intent(context, AdBlockVpnService::class.java))
+            if (running || !isEnabled(context)) return
+            if (prepare(context) != null) {
+                Log.w(TAG, "No hay permiso de VPN; el bloqueador no puede arrancar")
+                return
+            }
+            runCatching { context.startForegroundService(Intent(context, AdBlockVpnService::class.java)) }
+                .onFailure { Log.w(TAG, "No se pudo arrancar el bloqueador", it) }
         }
 
         fun stop(context: Context) {

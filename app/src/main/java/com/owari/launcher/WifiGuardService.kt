@@ -76,6 +76,8 @@ class WifiGuardService : Service() {
     private val tick = object : Runnable {
         override fun run() {
             check()
+            // Si Android detuvo el bloqueador de anuncios (por ejemplo al actualizar la app), se vuelve a prender.
+            com.owari.launcher.adblock.AdBlockVpnService.startIfEnabled(this@WifiGuardService)
             handler.postDelayed(this, CHECK_EVERY_MS)
         }
     }

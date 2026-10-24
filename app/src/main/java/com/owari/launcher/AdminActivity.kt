@@ -57,7 +57,9 @@ class AdminActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshAdb()
+        AdBlockVpnService.startIfEnabled(this)
         refreshAdBlock()
+        adBlockStatus.postDelayed({ refreshAdBlock() }, 2_000)
         registerReceiver(scanDone, IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION))
         scan()
     }
