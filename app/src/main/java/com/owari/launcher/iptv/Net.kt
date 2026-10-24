@@ -39,6 +39,28 @@ object Net {
         }
     }
 
+    private val siteIcons = mutableMapOf<String, String>()
+
+    /**
+     * Ícono oficial de un sitio web: el que la página declara como "apple-touch-icon"
+     * (o "icon"); si no tiene, el del buscador de íconos de Google.
+     */
+    fun loadSiteIcon(pageUrl: String, done: (Bitmap?) -> Unit) {
+        synchronized(siteIcons) { siteIcons[pageUrl] }?.let { loadImage(it, done = done); return }
+        pool.execute {
+            val icon = runCatching {
+                val html = get(pageUrl).bufferedReader().use { it.readText() }
+                val links = Regex("""<link[^>]+>""", RegexOption.IGNORE_CASE).findAll(html).map { it.value }.toList()
+                fun href(tag: String) = Regex("""href="([^"]+)"""").find(tag)?.groupValues?.get(1)
+                val best = links.firstOrNull { it.contains("apple-touch-icon", true) }?.let(::href)
+                    ?: links.firstOrNull { Regex("""rel="[^"]*icon""", RegexOption.IGNORE_CASE).containsMatchIn(it) && !it.contains(".svg") }?.let(::href)
+                best?.let { URL(URL(pageUrl), it).toString() }
+            }.getOrNull() ?: "https://www.google.com/s2/favicons?domain=${URL(pageUrl).host}&sz=128"
+            synchronized(siteIcons) { siteIcons[pageUrl] = icon }
+            main.post { loadImage(icon, done = done) }
+        }
+    }
+
     private val liveIds = mutableMapOf<String, Pair<String, Long>>()
 
     /** Busca qué video está transmitiendo ahora un canal oficial de YouTube (página /@canal/live). */

@@ -10,7 +10,7 @@ data class WebSite(val name: String, val url: String)
 object WebSites {
     private const val PREFS = "ajustes"
     private const val KEY = "sitios_web"
-    private val DEFAULTS = listOf(WebSite("Mercado Play", "https://play.mercadolibre.com"))
+    private val DEFAULTS = listOf(WebSite("Mercado Play", "https://play.mercadolibre.com.co/"))
 
     fun all(context: Context): List<WebSite> {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)
@@ -18,7 +18,9 @@ object WebSites {
         val array = runCatching { JSONArray(raw) }.getOrElse { return DEFAULTS }
         return List(array.length()) { i ->
             val o = array.getJSONObject(i)
-            WebSite(o.getString("name"), o.getString("url"))
+            // La primera versión guardaba la dirección general; la de Colombia es .com.co
+            val url = o.getString("url").let { if (it.trimEnd('/') == "https://play.mercadolibre.com") DEFAULTS[0].url else it }
+            WebSite(o.getString("name"), url)
         }
     }
 

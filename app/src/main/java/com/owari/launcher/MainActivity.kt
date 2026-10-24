@@ -25,6 +25,10 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.owari.launcher.iptv.Net
+import com.owari.launcher.web.BrowserActivity
+import com.owari.launcher.web.WebSite
+import com.owari.launcher.web.WebSites
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -46,6 +50,8 @@ class MainActivity : Activity() {
     private lateinit var overlayText: TextView
     private lateinit var favoritesRow: LinearLayout
     private lateinit var appsRow: LinearLayout
+    private lateinit var toolsRow: LinearLayout
+    private var sitesShown: List<WebSite> = emptyList()
 
     private val clockTick = object : Runnable {
         override fun run() {
@@ -84,6 +90,8 @@ class MainActivity : Activity() {
             recreate()
             return
         }
+        // Si agregaron o quitaron sitios web, se rehacen los favoritos.
+        if (WebSites.all(this) != sitesShown) loadFavorites()
         handler.post(clockTick)
         WifiStatus.listener = ::showWifiState
         showWifiState(WifiStatus.current)
@@ -127,6 +135,10 @@ class MainActivity : Activity() {
         column.addView(sectionTitle("Todas las apps"), marginTop(4))
         appsRow = row()
         column.addView(scroller(appsRow))
+
+        column.addView(sectionTitle("Ajustes"), marginTop(4))
+        toolsRow = row()
+        column.addView(scroller(toolsRow))
 
         wifiChip = label(14f, palette.onStrong).apply {
             setPadding(dp(14), dp(6), dp(14), dp(6))
@@ -185,6 +197,7 @@ class MainActivity : Activity() {
 
     private fun loadFavorites() {
         favoritesRow.removeAllViews()
+        toolsRow.removeAllViews()
         addAppTile(favoritesRow, "Netflix", "com.netflix.mediaclient", big = true)
         addAppTile(favoritesRow, "YouTube", "com.google.android.youtube.tv", big = true)
         favoritesRow.addView(tile("TV", big = true, background = palette.strong,
@@ -194,18 +207,24 @@ class MainActivity : Activity() {
         favoritesRow.addView(tile("TV por internet", big = true, background = palette.strong, badge = "TV IP") {
             open(Intent(this, com.owari.launcher.iptv.IptvActivity::class.java))
         })
-        favoritesRow.addView(tile("Sitios web", big = true, background = palette.strong, badge = "WEB") {
-            open(Intent(this, com.owari.launcher.web.WebSitesActivity::class.java))
-        })
-        favoritesRow.addView(tile("Entradas HDMI", big = true, background = palette.strong, badge = "HDMI") {
+        // Cada sitio guardado tiene su propio círculo con su ícono (Mercado Play viene de fábrica).
+        WebSites.all(this).forEach { site ->
+            favoritesRow.addView(tile(site.name, big = true, background = Color.WHITE,
+                siteUrl = site.url, badge = site.name.take(1)) {
+                open(Intent(this, BrowserActivity::class.java).putExtra(BrowserActivity.EXTRA_URL, site.url))
+            })
+        }
+        sitesShown = WebSites.all(this)
+        // Fila de ajustes, debajo de todas las apps.
+        toolsRow.addView(tile("Entradas HDMI", big = false, background = palette.strong, badge = "HDMI") {
             open(Intent("com.toptech.tv.action.TV_INPUTS"))
         })
-        favoritesRow.addView(tile("Wi-Fi", big = true, background = palette.soft,
+        toolsRow.addView(tile("Wi-Fi", big = false, background = palette.soft,
             icon = tinted(R.drawable.ic_wifi, palette.text)) {
             WifiGuardService.reconnectNow(this)
             open(Intent(Settings.ACTION_WIFI_SETTINGS))
         })
-        favoritesRow.addView(tile("Administración", big = true, background = palette.strong, badge = "ADMIN") {
+        toolsRow.addView(tile("Administración", big = false, background = palette.strong, badge = "ADMIN") {
             open(Intent(this, AdminActivity::class.java))
         })
     }
@@ -268,15 +287,16 @@ class MainActivity : Activity() {
         background: Int,
         icon: Drawable? = null,
         badge: String? = null,
+        siteUrl: String? = null,
         onClick: () -> Boolean,
     ): View {
-        val size = dp(if (big) 78 else 52)
+        val size = dp(if (big) 62 else 44)
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             clipChildren = false
             clipToPadding = false
-            setPadding(dp(6), dp(8), dp(6), dp(2))
+            setPadding(dp(4), dp(6), dp(4), dp(2))
             isFocusable = true
             isClickable = true
             contentDescription = name
@@ -299,19 +319,34 @@ class MainActivity : Activity() {
             }, FrameLayout.LayoutParams(-1, -1))
         } else {
             val text = badge ?: name
-            circle.addView(label(if (text.length > 4) 15f else 20f, palette.onStrong, bold = true).apply {
+            val textColor = if (background == Color.WHITE) palette.strong else palette.onStrong
+            val letters = label(if (text.length > 4) 12f else 16f, textColor, bold = true).apply {
                 this.text = text
                 gravity = Gravity.CENTER
-            }, FrameLayout.LayoutParams(-1, -1))
+            }
+            circle.addView(letters, FrameLayout.LayoutParams(-1, -1))
+            // Ícono oficial del sitio web, que se descarga; mientras tanto, la letra.
+            if (siteUrl != null) {
+                Net.loadSiteIcon(siteUrl) { bitmap ->
+                    if (bitmap == null) return@loadSiteIcon
+                    val pad = (size * 0.2f).toInt()
+                    circle.removeView(letters)
+                    circle.addView(ImageView(this).apply {
+                        setImageBitmap(bitmap)
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        setPadding(pad, pad, pad, pad)
+                    }, FrameLayout.LayoutParams(-1, -1))
+                }
+            }
         }
-        val caption = label(if (big) 13f else 11f, palette.text, bold = true).apply {
+        val caption = label(if (big) 12f else 10f, palette.text, bold = true).apply {
             text = name
             gravity = Gravity.CENTER
             maxLines = 1
             visibility = View.INVISIBLE
         }
         box.addView(circle, LinearLayout.LayoutParams(size, size))
-        box.addView(caption, LinearLayout.LayoutParams(size + dp(40), -2).apply { topMargin = dp(6) })
+        box.addView(caption, LinearLayout.LayoutParams(size + dp(30), -2).apply { topMargin = dp(4) })
 
         box.setOnFocusChangeListener { _, focused ->
             val ring = circle.background as GradientDrawable

@@ -9,6 +9,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
+import android.system.OsConstants
 import android.util.Log
 import com.owari.launcher.R
 import java.io.FileInputStream
@@ -95,6 +96,8 @@ class AdBlockVpnService : VpnService() {
             .addAddress(VPN_ADDRESS, 32)
             .addRoute(VPN_DNS, 32)
             .addDnsServer(VPN_DNS)
+            // Sin esto Android corta todo el IPv6 mientras la VPN está activa.
+            .allowFamily(OsConstants.AF_INET6)
             .setBlocking(true)
             .establish() ?: return
         tun = fd

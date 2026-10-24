@@ -2,6 +2,7 @@ package com.owari.launcher
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -84,6 +85,7 @@ class AdminActivity : Activity() {
 
         column.addView(adbSection(), spaced(20))
         column.addView(adBlockSection(), spaced(16))
+        column.addView(sitesSection(), spaced(16))
         column.addView(wifiSection(), spaced(16))
         column.addView(colorSection(), spaced(16))
 
@@ -213,8 +215,15 @@ class AdminActivity : Activity() {
         // La primera vez Android pregunta si se permite crear la VPN.
         val consent = VpnService.prepare(this)
         if (consent != null) {
-            adBlockStatus.text = "Acepta el aviso de Android para activar el bloqueador."
-            startActivityForResult(consent, REQUEST_VPN)
+            try {
+                adBlockStatus.text = "Acepta el aviso de Android para activar el bloqueador."
+                startActivityForResult(consent, REQUEST_VPN)
+            } catch (e: ActivityNotFoundException) {
+                // Algunas TV no traen la ventana de permiso de VPN. El permiso se da una vez con:
+                // adb shell appops set com.owari.launcher ACTIVATE_VPN allow
+                adBlockStatus.text = "Esta TV no tiene la ventana de permiso de VPN. " +
+                    "Hay que dar el permiso una vez desde el computador."
+            }
         } else {
             enableAdBlock()
         }
@@ -244,6 +253,21 @@ class AdminActivity : Activity() {
             on -> "Prendido, arrancando…"
             else -> "Apagado: los anuncios no se bloquean."
         }
+    }
+
+    // ---------- Sitios web ----------
+
+    private fun sitesSection(): View = card("Sitios web en Favoritos").apply {
+        addView(label(14f, palette.textSoft).apply {
+            text = "Cada sitio guardado aparece en Favoritos con su ícono y se abre sin ventanas emergentes ni anuncios."
+        }, spaced(4))
+        val open = label(16f, palette.text, bold = true).apply {
+            text = "🌐  Agregar o quitar sitios"
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        addView(selectable(open) {
+            startActivity(Intent(this@AdminActivity, com.owari.launcher.web.WebSitesActivity::class.java))
+        }, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(8) })
     }
 
     // ---------- Redes Wi-Fi ----------

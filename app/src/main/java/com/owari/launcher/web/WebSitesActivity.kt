@@ -32,7 +32,7 @@ class WebSitesActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(48), dp(28), dp(48), dp(28))
         }
-        column.addView(label(30f, palette.text, bold = true).apply { text = "Web" })
+        column.addView(label(30f, palette.text, bold = true).apply { text = "Sitios web" })
         column.addView(label(14f, palette.textSoft).apply {
             text = "Sitios sin ventanas emergentes ni anuncios. Dentro del sitio, mueve el cursor con las flechas y usa OK para hacer clic.\n" +
                 "Mantén OK o MENÚ sobre un sitio para quitarlo."
