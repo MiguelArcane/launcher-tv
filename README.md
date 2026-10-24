@@ -18,6 +18,7 @@ Pantalla de inicio sin publicidad para una Android TV (Android 12, HiSilicon/Top
   - Bloqueador de anuncios propio: VPN local que solo filtra el DNS con una lista de 70.581 dominios de [StevenBlack/hosts](https://github.com/StevenBlack/hosts) (MIT). No quita los anuncios de YouTube.
   - Redes Wi-Fi cercanas con su señal.
   - Color de fondo: amarillo, azul noche, negro, verde, rosado o morado.
+  - **Una app a la vez**: cada vez que cambia lo que está en pantalla (otra app, la TV, el inicio, un sitio web) y al prender o apagar la TV, se cierra todo lo demás menos el launcher. Usa un servicio de accesibilidad que solo mira el nombre de la app al frente.
 
 `targetSdk` se queda en 28 a propósito: desde Android 10 las apps que apuntan a 29+ no pueden apagar ni prender el Wi-Fi. Por eso Play Protect avisa al instalarlo.
 
@@ -37,11 +38,16 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell cmd package set-home-activity com.owari.launcher/.MainActivity
 ```
 
-Permisos que se dan una sola vez, para el interruptor de ADB y la lista de redes:
+Permisos que se dan una sola vez (ADB, lista de redes, bloqueador, volver al inicio al prender la TV y una app a la vez):
 
 ```bash
 adb shell pm grant com.owari.launcher android.permission.WRITE_SECURE_SETTINGS
 adb shell pm grant com.owari.launcher android.permission.ACCESS_FINE_LOCATION
+adb shell appops set com.owari.launcher ACTIVATE_VPN allow
+adb shell appops set com.owari.launcher SYSTEM_ALERT_WINDOW allow
+# Agregar el servicio de accesibilidad sin quitar los que ya hay (separados por dos puntos):
+adb shell settings put secure enabled_accessibility_services <los-que-había>:com.owari.launcher/com.owari.launcher.ForegroundWatcherService
+adb shell settings put secure accessibility_enabled 1
 ```
 
 Para volver a otro launcher, por ejemplo Projectivy:

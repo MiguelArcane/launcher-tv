@@ -203,15 +203,18 @@ class MainActivity : Activity() {
         addAppTile(favoritesRow, "YouTube", "com.google.android.youtube.tv", big = true)
         favoritesRow.addView(tile("TV", big = true, background = palette.strong,
             icon = tinted(R.drawable.ic_tv, palette.onStrong)) {
+            RamCleaner.freeFor(this, "com.toptech.tvmenu")
             open(ComponentName("com.toptech.tvmenu", "com.toptech.tvmenu.TvActivity"))
         })
         favoritesRow.addView(tile("TV por internet", big = true, background = palette.strong, badge = "TV IP") {
+            RamCleaner.freeFor(this, packageName)
             open(Intent(this, com.owari.launcher.iptv.IptvActivity::class.java))
         })
         // Cada sitio guardado tiene su propio círculo con su ícono (Mercado Play viene de fábrica).
         WebSites.all(this).forEach { site ->
             favoritesRow.addView(tile(site.name, big = true, background = Color.WHITE,
                 siteUrl = site.url, badge = site.name.take(1)) {
+                RamCleaner.freeFor(this, RamCleaner.WEB)
                 open(Intent(this, BrowserActivity::class.java).putExtra(BrowserActivity.EXTRA_URL, site.url))
             })
         }
@@ -265,6 +268,7 @@ class MainActivity : Activity() {
         val intent = packageManager.getLeanbackLaunchIntentForPackage(pkg)
             ?: packageManager.getLaunchIntentForPackage(pkg)
             ?: return false
+        RamCleaner.freeFor(this, pkg)
         return open(intent)
     }
 

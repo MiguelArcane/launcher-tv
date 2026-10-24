@@ -7,6 +7,8 @@
     <color name="cafe_medio">#5C4700</color>
     <color name="rojo">#A32D2D</color>
 
+    <string name="foreground_watcher_description">Avisa al Launcher Amarillo qué app está en pantalla para cerrar las demás y liberar memoria. No lee el contenido de las pantallas.</string>
+
     <style name="LauncherTheme" parent="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">
         <item name="android:windowBackground">@color/amarillo</item>
         <item name="android:windowShowWallpaper">false</item>

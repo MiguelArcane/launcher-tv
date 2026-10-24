@@ -29,7 +29,8 @@ import org.mozilla.geckoview.ScreenLength
  * Navegador a pantalla completa para la TV, con el motor de Firefox (GeckoView),
  * porque el motor web de la TV es de 2021 y los sitios modernos se ven desarmados.
  * - Bloquea ventanas emergentes y que el sitio te mande a otra página.
- * - Bloquea rastreadores de publicidad (además del bloqueador de anuncios de ADMIN).
+ * - Trae uBlock Origin de fábrica y bloquea rastreadores (además del bloqueador de ADMIN).
+ * - Corre en su propio proceso (":web") para poder cerrarlo entero y liberar memoria.
  * - Se maneja con un cursor: flechas para moverlo, OK para hacer clic, Atrás para volver.
  */
 class BrowserActivity : Activity() {
@@ -54,8 +55,16 @@ class BrowserActivity : Activity() {
                     )
                     .consoleOutput(false)
                     .build()
-            ).also { runtime = it }
+            ).also {
+                runtime = it
+                // uBlock Origin (oficial de addons.mozilla.org) viene dentro de la app y queda
+                // activo para todos los sitios: quita anuncios dentro de las páginas y los videos.
+                it.webExtensionController.ensureBuiltIn(UBLOCK_PATH, UBLOCK_ID)
+            }
         }
+
+        private const val UBLOCK_PATH = "resource://android/assets/ublock/"
+        private const val UBLOCK_ID = "uBlock0@raymondhill.net"
     }
 
     private lateinit var root: FrameLayout

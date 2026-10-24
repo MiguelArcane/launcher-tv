@@ -4,8 +4,10 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -82,6 +84,21 @@ class WifiGuardService : Service() {
         }
     }
 
+    /**
+     * Al apagar (modo espera) o prender la TV: vuelve al inicio y cierra todas las apps
+     * menos el launcher, para que arranque siempre limpia y con la memoria libre.
+     */
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (!RamCleaner.isEnabled(context)) return
+            runCatching {
+                startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            // Se espera a que el inicio quede al frente: así las demás apps pasan a segundo plano y se pueden cerrar.
+            handler.postDelayed({ RamCleaner.freeFor(context, context.packageName) }, 1_500)
+        }
+    }
+
     private val callback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) { handler.post { check() } }
         override fun onLost(network: Network) { handler.post { check() } }
@@ -96,6 +113,10 @@ class WifiGuardService : Service() {
             NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build(),
             callback
         )
+        registerReceiver(screenReceiver, IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+        })
         handler.post(tick)
     }
 
@@ -112,6 +133,7 @@ class WifiGuardService : Service() {
     override fun onDestroy() {
         handler.removeCallbacksAndMessages(null)
         runCatching { connectivity.unregisterNetworkCallback(callback) }
+        runCatching { unregisterReceiver(screenReceiver) }
         super.onDestroy()
     }
 

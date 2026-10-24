@@ -87,6 +87,7 @@ class AdminActivity : Activity() {
 
         column.addView(adbSection(), spaced(20))
         column.addView(adBlockSection(), spaced(16))
+        column.addView(oneAppSection(), spaced(16))
         column.addView(sitesSection(), spaced(16))
         column.addView(wifiSection(), spaced(16))
         column.addView(colorSection(), spaced(16))
@@ -255,6 +256,36 @@ class AdminActivity : Activity() {
             on -> "Prendido, arrancando…"
             else -> "Apagado: los anuncios no se bloquean."
         }
+    }
+
+    // ---------- Una app a la vez ----------
+
+    private lateinit var oneAppSwitch: Switch
+
+    private fun oneAppSection(): View = card("Una app a la vez").apply {
+        addView(label(14f, palette.textSoft).apply {
+            text = "Cada vez que cambias de lugar (otra app, la TV, el inicio o un sitio web) y al prender o " +
+                "apagar la TV, se cierra todo lo demás menos el launcher, para que la TV tenga más memoria libre."
+        }, spaced(4))
+        val row = LinearLayout(this@AdminActivity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        row.addView(label(18f, palette.text, bold = true).apply { text = "Cerrar las otras apps" },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        oneAppSwitch = Switch(this@AdminActivity).apply {
+            isFocusable = false
+            isClickable = false
+            scaleX = 1.3f
+            scaleY = 1.3f
+            isChecked = RamCleaner.isEnabled(this@AdminActivity)
+        }
+        row.addView(oneAppSwitch, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(12) })
+        addView(selectable(row) {
+            RamCleaner.setEnabled(this@AdminActivity, !RamCleaner.isEnabled(this@AdminActivity))
+            oneAppSwitch.isChecked = RamCleaner.isEnabled(this@AdminActivity)
+        }, spaced(10))
     }
 
     // ---------- Sitios web ----------

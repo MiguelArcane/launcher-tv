@@ -323,6 +323,7 @@ class IptvActivity : Activity() {
 
     private fun openYouTube(channel: Channel) {
         Toast.makeText(this, "Abriendo ${channel.name} en YouTube…", Toast.LENGTH_SHORT).show()
+        com.owari.launcher.RamCleaner.freeFor(this, "com.google.android.youtube.tv")
         Net.youTubeLiveId(channel.url) { id ->
             val uri = Uri.parse(if (id != null) "https://www.youtube.com/watch?v=$id" else channel.url)
             val intent = Intent(Intent.ACTION_VIEW, uri).setPackage("com.google.android.youtube.tv")
