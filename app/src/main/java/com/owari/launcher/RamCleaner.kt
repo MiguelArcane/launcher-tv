@@ -65,9 +65,14 @@ object RamCleaner {
         packages.forEach { runCatching { am.killBackgroundProcesses(it) } }
 
         // El motor web (Firefox) corre en procesos propios de la app: se cierran si no se está usando.
+        // Nunca mientras el navegador esté en pantalla, aunque algo más haya avisado que pasó al frente.
         var webClosed = 0
-        if (keep != WEB) {
-            am.runningAppProcesses?.forEach { info ->
+        val processes = am.runningAppProcesses.orEmpty()
+        val browserVisible = processes.any {
+            it.processName == "$own$WEB" && it.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE
+        }
+        if (keep != WEB && !browserVisible) {
+            processes.forEach { info ->
                 if (info.pid != Process.myPid() && info.processName.startsWith("$own:")) {
                     Process.killProcess(info.pid)
                     webClosed++
