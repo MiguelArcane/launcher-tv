@@ -1,6 +1,5 @@
 package com.owari.launcher.web
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.graphics.Canvas
@@ -8,89 +7,106 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.net.Uri
 import android.os.Bundle
-import android.os.Message
 import android.os.SystemClock
+import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
-import android.view.ViewGroup
 import android.view.WindowManager
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.Toast
-import com.owari.launcher.adblock.Blocklist
-import java.io.ByteArrayInputStream
+import org.mozilla.geckoview.AllowOrDeny
+import org.mozilla.geckoview.ContentBlocking
+import org.mozilla.geckoview.GeckoResult
+import org.mozilla.geckoview.GeckoRuntime
+import org.mozilla.geckoview.GeckoRuntimeSettings
+import org.mozilla.geckoview.GeckoSession
+import org.mozilla.geckoview.GeckoSessionSettings
+import org.mozilla.geckoview.GeckoView
+import org.mozilla.geckoview.ScreenLength
 
 /**
- * Navegador a pantalla completa para la TV, sin barra de direcciones:
- * - bloquea ventanas emergentes y que el sitio te mande a otra página,
- * - bloquea anuncios con la misma lista del bloqueador,
- * - se maneja con un cursor: flechas para moverlo, OK para hacer clic, Atrás para volver.
+ * Navegador a pantalla completa para la TV, con el motor de Firefox (GeckoView),
+ * porque el motor web de la TV es de 2021 y los sitios modernos se ven desarmados.
+ * - Bloquea ventanas emergentes y que el sitio te mande a otra página.
+ * - Bloquea rastreadores de publicidad (además del bloqueador de anuncios de ADMIN).
+ * - Se maneja con un cursor: flechas para moverlo, OK para hacer clic, Atrás para volver.
  */
 class BrowserActivity : Activity() {
 
     companion object {
         const val EXTRA_URL = "url"
-        private const val DESKTOP_UA =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
+
+        @Volatile private var runtime: GeckoRuntime? = null
+
+        /** Firefox se arranca una sola vez por app: es pesado para la memoria de la TV. */
+        private fun runtime(context: Context): GeckoRuntime = runtime ?: synchronized(this) {
+            runtime ?: GeckoRuntime.create(
+                context.applicationContext,
+                GeckoRuntimeSettings.Builder()
+                    .contentBlocking(
+                        ContentBlocking.Settings.Builder()
+                            .antiTracking(
+                                ContentBlocking.AntiTracking.DEFAULT or ContentBlocking.AntiTracking.AD or
+                                    ContentBlocking.AntiTracking.CRYPTOMINING or ContentBlocking.AntiTracking.FINGERPRINTING
+                            )
+                            .build()
+                    )
+                    .consoleOutput(false)
+                    .build()
+            ).also { runtime = it }
+        }
     }
 
     private lateinit var root: FrameLayout
-    private lateinit var web: WebView
+    private lateinit var view: GeckoView
+    private lateinit var session: GeckoSession
     private lateinit var cursor: CursorView
-    private lateinit var blocklist: Blocklist
     private lateinit var homeDomain: String
-    private var fullscreenView: View? = null
-    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private var canGoBack = false
+    private var fullscreen = false
     private var lastBlockedToast = 0L
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val url = intent.getStringExtra(EXTRA_URL) ?: return finish()
         homeDomain = baseDomain(Uri.parse(url).host ?: "")
-        blocklist = Blocklist.get(this)
+
+        session = GeckoSession(
+            GeckoSessionSettings.Builder()
+                .userAgentMode(GeckoSessionSettings.USER_AGENT_MODE_DESKTOP)
+                .viewportMode(GeckoSessionSettings.VIEWPORT_MODE_DESKTOP)
+                .build()
+        )
+        session.navigationDelegate = Navigation()
+        session.contentDelegate = Content()
 
         root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
-        web = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.mediaPlaybackRequiresUserGesture = false
-            settings.userAgentString = DESKTOP_UA
-            settings.useWideViewPort = true
-            settings.loadWithOverviewMode = true
-            // Las ventanas nuevas se piden a onCreateWindow, donde se rechazan.
-            settings.setSupportMultipleWindows(true)
-            settings.javaScriptCanOpenWindowsAutomatically = false
-            webViewClient = Client()
-            webChromeClient = Chrome()
-            isFocusable = false
-        }
+        view = GeckoView(this).apply { isFocusable = false }
         cursor = CursorView(this)
-        root.addView(web, FrameLayout.LayoutParams(-1, -1))
+        root.addView(view, FrameLayout.LayoutParams(-1, -1))
         root.addView(cursor, FrameLayout.LayoutParams(-1, -1))
         setContentView(root)
-        web.loadUrl(url)
+
+        session.open(runtime(this))
+        view.setSession(session)
+        session.loadUri(url)
     }
 
     override fun onPause() {
-        web.onPause()
+        session.setActive(false)
         super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
-        web.onResume()
+        session.setActive(true)
     }
 
     override fun onDestroy() {
-        root.removeView(web)
-        web.destroy()
+        view.releaseSession()
+        session.close()
         super.onDestroy()
     }
 
@@ -106,8 +122,6 @@ class BrowserActivity : Activity() {
         return parts.takeLast(if (takeThree) 3 else 2).joinToString(".")
     }
 
-    private fun isSameSite(url: Uri) = baseDomain(url.host ?: "") == homeDomain
-
     private fun showBlocked() {
         val now = SystemClock.elapsedRealtime()
         if (now - lastBlockedToast > 4_000) {
@@ -116,41 +130,38 @@ class BrowserActivity : Activity() {
         }
     }
 
-    private inner class Client : WebViewClient() {
-        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-            val target = request.url
-            if (target.scheme != "http" && target.scheme != "https") return true // intent://, market://, etc.
-            if (!request.isForMainFrame || isSameSite(target)) return false
-            // El sitio intentó mandarte a otra página (casi siempre publicidad).
-            showBlocked()
-            return true
+    private inner class Navigation : GeckoSession.NavigationDelegate {
+        override fun onCanGoBack(session: GeckoSession, value: Boolean) {
+            canGoBack = value
         }
 
-        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-            val host = request.url.host ?: return null
-            if (!blocklist.isBlocked(host)) return null
-            return WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
+        override fun onLoadRequest(
+            session: GeckoSession,
+            request: GeckoSession.NavigationDelegate.LoadRequest,
+        ): GeckoResult<AllowOrDeny> {
+            val target = Uri.parse(request.uri)
+            val scheme = target.scheme ?: ""
+            val allowed = when {
+                scheme == "about" || scheme == "data" || scheme == "blob" -> true
+                scheme != "http" && scheme != "https" -> false // intent://, market://, etc.
+                // Ventana o pestaña nueva: casi siempre publicidad.
+                request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW -> false
+                else -> baseDomain(target.host ?: "") == homeDomain
+            }
+            if (!allowed) runOnUiThread { showBlocked() }
+            return GeckoResult.fromValue(if (allowed) AllowOrDeny.ALLOW else AllowOrDeny.DENY)
+        }
+
+        override fun onNewSession(session: GeckoSession, uri: String): GeckoResult<GeckoSession>? {
+            runOnUiThread { showBlocked() } // ventana emergente
+            return null
         }
     }
 
-    private inner class Chrome : WebChromeClient() {
-        override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
-            showBlocked() // ventana emergente
-            return false
-        }
-
-        override fun onShowCustomView(view: View, callback: CustomViewCallback) {
-            fullscreenView = view
-            fullscreenCallback = callback
-            root.addView(view, root.indexOfChild(cursor), FrameLayout.LayoutParams(-1, -1))
-            web.visibility = View.GONE
-        }
-
-        override fun onHideCustomView() {
-            fullscreenView?.let { root.removeView(it) }
-            fullscreenView = null
-            fullscreenCallback = null
-            web.visibility = View.VISIBLE
+    private inner class Content : GeckoSession.ContentDelegate {
+        override fun onFullScreen(session: GeckoSession, fullScreen: Boolean) {
+            fullscreen = fullScreen
+            cursor.visibility = if (fullScreen) View.GONE else View.VISIBLE
         }
     }
 
@@ -164,6 +175,8 @@ class BrowserActivity : Activity() {
         val isArrow = code == KeyEvent.KEYCODE_DPAD_UP || code == KeyEvent.KEYCODE_DPAD_DOWN ||
             code == KeyEvent.KEYCODE_DPAD_LEFT || code == KeyEvent.KEYCODE_DPAD_RIGHT
         val isOk = code == KeyEvent.KEYCODE_DPAD_CENTER || code == KeyEvent.KEYCODE_ENTER
+        // En pantalla completa (video) las teclas van al reproductor del sitio.
+        if (fullscreen && code != KeyEvent.KEYCODE_BACK) return super.dispatchKeyEvent(event)
         if (!isArrow && !isOk) return super.dispatchKeyEvent(event)
 
         if (isOk) {
@@ -190,21 +203,27 @@ class BrowserActivity : Activity() {
         val margin = (12 * resources.displayMetrics.density).toInt()
         val newX = cursor.cx + dx
         val newY = cursor.cy + dy
-        if (newY < margin) web.scrollBy(0, dy)
-        if (newY > root.height - margin) web.scrollBy(0, dy)
-        if (newX < margin || newX > root.width - margin) web.scrollBy(dx, 0)
+        val scrollX = if (newX < margin || newX > root.width - margin) dx else 0
+        val scrollY = if (newY < margin || newY > root.height - margin) dy * 3 else 0
+        if (scrollX != 0 || scrollY != 0) {
+            session.panZoomController.scrollBy(
+                ScreenLength.fromPixels(scrollX.toDouble()),
+                ScreenLength.fromPixels(scrollY.toDouble()),
+            )
+        }
         cursor.moveTo(newX.coerceIn(margin, root.width - margin), newY.coerceIn(margin, root.height - margin))
     }
 
     private fun click() {
-        val target: View = fullscreenView ?: web
         val time = SystemClock.uptimeMillis()
         val x = cursor.cx.toFloat()
         val y = cursor.cy.toFloat()
         val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, x, y, 0)
         val up = MotionEvent.obtain(time, time + 60, MotionEvent.ACTION_UP, x, y, 0)
-        target.dispatchTouchEvent(down)
-        target.dispatchTouchEvent(up)
+        down.source = InputDevice.SOURCE_TOUCHSCREEN
+        up.source = InputDevice.SOURCE_TOUCHSCREEN
+        view.dispatchTouchEvent(down)
+        view.dispatchTouchEvent(up)
         down.recycle()
         up.recycle()
         cursor.pulse()
@@ -213,8 +232,8 @@ class BrowserActivity : Activity() {
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
         when {
-            fullscreenView != null -> fullscreenCallback?.onCustomViewHidden() ?: Unit
-            web.canGoBack() -> web.goBack()
+            fullscreen -> session.exitFullScreen()
+            canGoBack -> session.goBack()
             else -> super.onBackPressed()
         }
     }
@@ -232,6 +251,11 @@ class BrowserActivity : Activity() {
         }
         private var pressed = false
 
+        init {
+            isFocusable = false
+            isClickable = false
+        }
+
         override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
             if (cx == 0 && cy == 0) { cx = w / 2; cy = h / 2 }
         }
@@ -248,12 +272,6 @@ class BrowserActivity : Activity() {
             val r = (if (pressed) 8 else 11) * density
             canvas.drawCircle(cx.toFloat(), cy.toFloat(), r, fill)
             canvas.drawCircle(cx.toFloat(), cy.toFloat(), r, ring)
-        }
-
-        init {
-            isFocusable = false
-            isClickable = false
-            layoutParams = ViewGroup.LayoutParams(-1, -1)
         }
     }
 }

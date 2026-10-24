@@ -3,7 +3,8 @@
 Pantalla de inicio sin publicidad para una Android TV (Android 12, HiSilicon/TopTech).
 
 - Reloj grande y fecha en español.
-- Favoritos: Netflix, YouTube, TV, TV IP, Web, HDMI, Wi-Fi y ADMIN.
+- Favoritos: Netflix, YouTube, TV, TV IP y los sitios web guardados.
+- Ajustes (debajo de las apps): HDMI, Wi-Fi y ADMIN.
 - Todas las apps instaladas, en orden alfabético.
 - **Vigilante de Wi-Fi**: si la TV se queda sin red más de 10 segundos, pide reconectar o apaga y prende el Wi-Fi (hasta 5 intentos; luego reintenta cada 5 minutos).
 - **TV IP**: 1.153 canales gratuitos de 20 países (Colombia primero), con miniatura de lo que están pasando que se renueva cada minuto.
@@ -11,7 +12,7 @@ Pantalla de inicio sin publicidad para una Android TV (Android 12, HiSilicon/Top
   - El resto viene de la lista pública [iptv-org](https://github.com/iptv-org/iptv), filtrada: sin canales de pago, sin retransmisiones desde IP sueltas, y probados uno por uno.
   - Flechas, CH+/CH− o siguiente/anterior cambian de canal.
   - Mantener OK o MENÚ sobre un canal permite cambiar su dirección o restaurar la de fábrica (que nunca se borra). También se pueden agregar canales.
-- **Web**: sitios guardados (Mercado Play de fábrica) en un navegador con cursor para el control, que bloquea ventanas emergentes, redirecciones a otros sitios y anuncios.
+- **Sitios web en Favoritos**, cada uno con su ícono (Mercado Play de fábrica). Se abren con el motor de Firefox (GeckoView 140 ESR), porque el de la TV (Chromium 91) no entiende los sitios modernos. Cursor para el control, sin ventanas emergentes, sin redirecciones a otros sitios y con bloqueo de rastreadores de publicidad. Se agregan o quitan en ADMIN.
 - **ADMIN**:
   - Interruptor de ADB por red.
   - Bloqueador de anuncios propio: VPN local que solo filtra el DNS con una lista de 70.581 dominios de [StevenBlack/hosts](https://github.com/StevenBlack/hosts) (MIT). No quita los anuncios de YouTube.

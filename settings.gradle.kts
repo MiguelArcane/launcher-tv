@@ -10,6 +10,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Motor web de Firefox (GeckoView).
+        maven("https://maven.mozilla.org/maven2/")
     }
 }
 rootProject.name = "LauncherAmarillo"
