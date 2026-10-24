@@ -1,14 +1,21 @@
 # Launcher Amarillo
 
-Pantalla de inicio sin publicidad para una Android TV (Android 12, HiSilicon/TopTech), con reconexión automática del Wi-Fi.
+Pantalla de inicio sin publicidad para una Android TV (Android 12, HiSilicon/TopTech).
 
 - Reloj grande y fecha en español.
-- Favoritos: Netflix, YouTube, TV, HDMI y Wi-Fi.
+- Favoritos: Netflix, YouTube, TV, TV IP, Web, HDMI, Wi-Fi y ADMIN.
 - Todas las apps instaladas, en orden alfabético.
-- Vigilante de Wi-Fi en segundo plano: si la TV se queda sin red más de 10 segundos, pide reconectar o apaga y prende el Wi-Fi (hasta 5 intentos; luego reintenta cada 5 minutos).
-- Pantalla ADMIN (círculo en Favoritos):
-  - Interruptor para prender o apagar el ADB por red.
-  - Redes Wi-Fi cercanas con su señal (barras, calidad y dBm), para ver cuál llega mejor a la TV.
+- **Vigilante de Wi-Fi**: si la TV se queda sin red más de 10 segundos, pide reconectar o apaga y prende el Wi-Fi (hasta 5 intentos; luego reintenta cada 5 minutos).
+- **TV IP**: 1.153 canales gratuitos de 20 países (Colombia primero), con miniatura de lo que están pasando que se renueva cada minuto.
+  - Caracol TV, Canal RCN, Noticias Caracol, Noticias RCN y NTN24 abren su transmisión oficial en YouTube.
+  - El resto viene de la lista pública [iptv-org](https://github.com/iptv-org/iptv), filtrada: sin canales de pago, sin retransmisiones desde IP sueltas, y probados uno por uno.
+  - Flechas, CH+/CH− o siguiente/anterior cambian de canal.
+  - Mantener OK o MENÚ sobre un canal permite cambiar su dirección o restaurar la de fábrica (que nunca se borra). También se pueden agregar canales.
+- **Web**: sitios guardados (Mercado Play de fábrica) en un navegador con cursor para el control, que bloquea ventanas emergentes, redirecciones a otros sitios y anuncios.
+- **ADMIN**:
+  - Interruptor de ADB por red.
+  - Bloqueador de anuncios propio: VPN local que solo filtra el DNS con una lista de 70.581 dominios de [StevenBlack/hosts](https://github.com/StevenBlack/hosts) (MIT). No quita los anuncios de YouTube.
+  - Redes Wi-Fi cercanas con su señal.
   - Color de fondo: amarillo, azul noche, negro, verde, rosado o morado.
 
 `targetSdk` se queda en 28 a propósito: desde Android 10 las apps que apuntan a 29+ no pueden apagar ni prender el Wi-Fi. Por eso Play Protect avisa al instalarlo.

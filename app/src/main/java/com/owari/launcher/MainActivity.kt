@@ -191,6 +191,12 @@ class MainActivity : Activity() {
             icon = tinted(R.drawable.ic_tv, palette.onStrong)) {
             open(ComponentName("com.toptech.tvmenu", "com.toptech.tvmenu.TvActivity"))
         })
+        favoritesRow.addView(tile("TV por internet", big = true, background = palette.strong, badge = "TV IP") {
+            open(Intent(this, com.owari.launcher.iptv.IptvActivity::class.java))
+        })
+        favoritesRow.addView(tile("Sitios web", big = true, background = palette.strong, badge = "WEB") {
+            open(Intent(this, com.owari.launcher.web.WebSitesActivity::class.java))
+        })
         favoritesRow.addView(tile("Entradas HDMI", big = true, background = palette.strong, badge = "HDMI") {
             open(Intent("com.toptech.tv.action.TV_INPUTS"))
         })

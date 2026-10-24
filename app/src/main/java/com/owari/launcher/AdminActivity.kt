@@ -9,7 +9,9 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
+import android.net.VpnService
 import android.net.wifi.ScanResult
+import com.owari.launcher.adblock.AdBlockVpnService
 import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.provider.Settings
@@ -22,10 +24,14 @@ import android.widget.Switch
 import android.widget.TextView
 
 /**
- * Pantalla de administración: prender/apagar el ADB por red, ver la señal de las
- * redes Wi-Fi cercanas y cambiar el color de fondo de la pantalla de inicio.
+ * Pantalla de administración: prender/apagar el ADB por red y el bloqueo de anuncios,
+ * ver la señal de las redes Wi-Fi cercanas y cambiar el color de fondo del inicio.
  */
 class AdminActivity : Activity() {
+
+    companion object {
+        private const val REQUEST_VPN = 2
+    }
 
     private lateinit var palette: Palette
     private lateinit var wifi: WifiManager
@@ -50,6 +56,7 @@ class AdminActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refreshAdb()
+        refreshAdBlock()
         registerReceiver(scanDone, IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION))
         scan()
     }
@@ -76,6 +83,7 @@ class AdminActivity : Activity() {
         })
 
         column.addView(adbSection(), spaced(20))
+        column.addView(adBlockSection(), spaced(16))
         column.addView(wifiSection(), spaced(16))
         column.addView(colorSection(), spaced(16))
 
@@ -158,6 +166,83 @@ class AdminActivity : Activity() {
             "Prendido: se puede conectar a $address:5555"
         } else {
             "Apagado: nadie puede conectarse a la TV por la red."
+        }
+    }
+
+    // ---------- Bloqueo de anuncios ----------
+
+    private lateinit var adBlockSwitch: Switch
+    private lateinit var adBlockStatus: TextView
+
+    private fun adBlockSection(): View = card("Bloqueo de anuncios").apply {
+        addView(label(14f, palette.textSoft).apply {
+            text = "Bloqueador propio con una lista de más de 70.000 dominios de anuncios y rastreadores, " +
+                "para toda la TV. Funciona como una VPN que no sale de la TV. " +
+                "No quita los anuncios de YouTube: esos vienen del mismo lugar que los videos."
+        }, spaced(4))
+
+        val row = LinearLayout(this@AdminActivity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        row.addView(label(18f, palette.text, bold = true).apply { text = "Bloquear anuncios" },
+            LinearLayout.LayoutParams(0, -2, 1f))
+        adBlockSwitch = Switch(this@AdminActivity).apply {
+            isFocusable = false
+            isClickable = false
+            scaleX = 1.3f
+            scaleY = 1.3f
+        }
+        row.addView(adBlockSwitch, LinearLayout.LayoutParams(-2, -2).apply { rightMargin = dp(12) })
+        addView(selectable(row) { setAdBlock(!adBlockOn()) }, spaced(10))
+
+        adBlockStatus = label(14f, palette.textSoft)
+        addView(adBlockStatus, spaced(6))
+    }
+
+    private fun adBlockOn(): Boolean = AdBlockVpnService.isEnabled(this)
+
+    private fun setAdBlock(on: Boolean) {
+        if (!on) {
+            AdBlockVpnService.setEnabled(this, false)
+            AdBlockVpnService.stop(this)
+            refreshAdBlock()
+            return
+        }
+        // La primera vez Android pregunta si se permite crear la VPN.
+        val consent = VpnService.prepare(this)
+        if (consent != null) {
+            adBlockStatus.text = "Acepta el aviso de Android para activar el bloqueador."
+            startActivityForResult(consent, REQUEST_VPN)
+        } else {
+            enableAdBlock()
+        }
+    }
+
+    private fun enableAdBlock() {
+        AdBlockVpnService.setEnabled(this, true)
+        AdBlockVpnService.startIfEnabled(this)
+        adBlockStatus.postDelayed({ refreshAdBlock() }, 1_500)
+        refreshAdBlock()
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == REQUEST_VPN) {
+            if (resultCode == RESULT_OK) enableAdBlock()
+            else adBlockStatus.text = "No se activó: hay que aceptar el aviso de Android."
+        }
+    }
+
+    private fun refreshAdBlock() {
+        val on = adBlockOn()
+        adBlockSwitch.isChecked = on
+        adBlockStatus.text = when {
+            on && AdBlockVpnService.running ->
+                "Prendido: ${AdBlockVpnService.blockedCount.get()} anuncios bloqueados desde que se prendió la TV."
+            on -> "Prendido, arrancando…"
+            else -> "Apagado: los anuncios no se bloquean."
         }
     }
 

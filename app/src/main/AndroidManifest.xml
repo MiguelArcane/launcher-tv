@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Para ver las redes Wi-Fi cercanas en ADMIN. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -24,7 +25,8 @@
         android:icon="@drawable/ic_app"
         android:banner="@drawable/ic_app"
         android:theme="@style/LauncherTheme"
-        android:allowBackup="false">
+        android:allowBackup="false"
+        android:usesCleartextTraffic="true">
 
         <activity
             android:name=".MainActivity"
@@ -47,9 +49,48 @@
             android:exported="false"
             android:screenOrientation="landscape" />
 
+        <activity
+            android:name=".iptv.IptvActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".iptv.PlayerActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode" />
+
+        <activity
+            android:name=".web.WebSitesActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <activity
+            android:name=".web.BrowserActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:hardwareAccelerated="true"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|uiMode" />
+
+        <activity
+            android:name=".iptv.ChannelEditActivity"
+            android:exported="false"
+            android:screenOrientation="landscape"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name=".WifiGuardService"
             android:exported="false" />
+
+        <!-- Bloqueador de anuncios: VPN local que solo filtra las consultas de DNS. -->
+        <service
+            android:name=".adblock.AdBlockVpnService"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".BootReceiver"
