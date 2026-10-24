@@ -8,14 +8,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.Outline
-import android.graphics.Typeface
+import android.graphics.PorterDuff
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -32,12 +31,7 @@ import java.util.Locale
 
 class MainActivity : Activity() {
 
-    private val amarillo = Color.parseColor("#F6C90E")
-    private val amarilloOscuro = Color.parseColor("#E0B400")
-    private val amarilloClaro = Color.parseColor("#FFF3B0")
-    private val cafe = Color.parseColor("#2B2100")
-    private val cafeMedio = Color.parseColor("#5C4700")
-    private val rojo = Color.parseColor("#A32D2D")
+    private lateinit var palette: Palette
 
     private val spanish = Locale("es", "CO")
     private val timeFormat = SimpleDateFormat("H:mm", spanish)
@@ -68,6 +62,8 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        palette = Palette.current(this)
+        window.setBackgroundDrawable(null)
         setContentView(buildScreen())
         WifiGuardService.start(this)
         registerReceiver(packagesChanged, IntentFilter().apply {
@@ -83,6 +79,11 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        // Si cambiaron el color en ADMIN, se vuelve a dibujar la pantalla.
+        if (Palette.current(this) != palette) {
+            recreate()
+            return
+        }
         handler.post(clockTick)
         WifiStatus.listener = ::showWifiState
         showWifiState(WifiStatus.current)
@@ -106,7 +107,7 @@ class MainActivity : Activity() {
     // ---------- Pantalla ----------
 
     private fun buildScreen(): View {
-        val root = FrameLayout(this).apply { setBackgroundColor(amarillo) }
+        val root = FrameLayout(this).apply { setBackgroundColor(palette.background) }
 
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -114,8 +115,8 @@ class MainActivity : Activity() {
         }
         root.addView(column, FrameLayout.LayoutParams(-1, -1))
 
-        clock = text(64f, cafe, bold = true).apply { includeFontPadding = false }
-        date = text(18f, cafeMedio)
+        clock = label(64f, palette.text, bold = true).apply { includeFontPadding = false }
+        date = label(18f, palette.textSoft)
         column.addView(clock)
         column.addView(date)
 
@@ -127,9 +128,8 @@ class MainActivity : Activity() {
         appsRow = row()
         column.addView(scroller(appsRow))
 
-        wifiChip = text(14f, amarillo).apply {
+        wifiChip = label(14f, palette.onStrong).apply {
             setPadding(dp(14), dp(6), dp(14), dp(6))
-            background = rounded(cafe, dp(20).toFloat())
         }
         root.addView(wifiChip, FrameLayout.LayoutParams(-2, -2, Gravity.TOP or Gravity.END).apply {
             setMargins(0, dp(32), dp(48), 0)
@@ -139,12 +139,12 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(28), dp(20), dp(28), dp(20))
-            background = rounded(cafe, dp(16).toFloat())
+            background = rounded(Color.parseColor("#2B2100"), dp(16).toFloat())
             visibility = View.GONE
             elevation = dp(8).toFloat()
         }
-        overlayTitle = text(20f, amarillo, bold = true).apply { gravity = Gravity.CENTER }
-        overlayText = text(14f, amarilloClaro).apply { gravity = Gravity.CENTER }
+        overlayTitle = label(20f, Color.parseColor("#F6C90E"), bold = true).apply { gravity = Gravity.CENTER }
+        overlayText = label(14f, Color.parseColor("#FFF3B0")).apply { gravity = Gravity.CENTER }
         overlay.addView(overlayTitle)
         overlay.addView(overlayText, marginTop(6))
         root.addView(overlay, FrameLayout.LayoutParams(dp(460), -2, Gravity.TOP or Gravity.CENTER_HORIZONTAL).apply {
@@ -157,27 +157,28 @@ class MainActivity : Activity() {
         when (state) {
             is WifiState.Connected -> {
                 wifiChip.text = "●  " + (state.name ?: "Wi-Fi conectado")
-                wifiChip.setTextColor(amarillo)
-                wifiChip.background = rounded(cafe, dp(20).toFloat())
+                wifiChip.setTextColor(palette.onStrong)
+                wifiChip.background = rounded(palette.strong, dp(20).toFloat())
                 overlay.visibility = View.GONE
             }
             is WifiState.Reconnecting -> {
-                wifiChip.text = "●  Sin Wi-Fi"
-                wifiChip.setTextColor(Color.WHITE)
-                wifiChip.background = rounded(rojo, dp(20).toFloat())
+                showOffline()
                 overlayTitle.text = "Reconectando el Wi-Fi…"
                 overlayText.text = "Intento ${state.attempt} de ${state.max}. No hace falta tocar nada."
-                overlay.visibility = View.VISIBLE
             }
             WifiState.GaveUp -> {
-                wifiChip.text = "●  Sin Wi-Fi"
-                wifiChip.setTextColor(Color.WHITE)
-                wifiChip.background = rounded(rojo, dp(20).toFloat())
+                showOffline()
                 overlayTitle.text = "No se pudo reconectar"
                 overlayText.text = "Lo vuelvo a intentar en 5 minutos.\nTambién puedes entrar al botón Wi-Fi de Favoritos."
-                overlay.visibility = View.VISIBLE
             }
         }
+    }
+
+    private fun showOffline() {
+        wifiChip.text = "●  Sin Wi-Fi"
+        wifiChip.setTextColor(Color.WHITE)
+        wifiChip.background = rounded(palette.alert, dp(20).toFloat())
+        overlay.visibility = View.VISIBLE
     }
 
     // ---------- Apps ----------
@@ -186,19 +187,25 @@ class MainActivity : Activity() {
         favoritesRow.removeAllViews()
         addAppTile(favoritesRow, "Netflix", "com.netflix.mediaclient", big = true)
         addAppTile(favoritesRow, "YouTube", "com.google.android.youtube.tv", big = true)
-        favoritesRow.addView(tile("TV", big = true, background = cafe,
-            icon = getDrawable(R.drawable.ic_tv)) {
+        favoritesRow.addView(tile("TV", big = true, background = palette.strong,
+            icon = tinted(R.drawable.ic_tv, palette.onStrong)) {
             open(ComponentName("com.toptech.tvmenu", "com.toptech.tvmenu.TvActivity"))
         })
-        favoritesRow.addView(tile("Entradas HDMI", big = true, background = cafe, label = "HDMI") {
+        favoritesRow.addView(tile("Entradas HDMI", big = true, background = palette.strong, badge = "HDMI") {
             open(Intent("com.toptech.tv.action.TV_INPUTS"))
         })
-        favoritesRow.addView(tile("Wi-Fi", big = true, background = amarilloClaro,
-            icon = getDrawable(R.drawable.ic_wifi)) {
+        favoritesRow.addView(tile("Wi-Fi", big = true, background = palette.soft,
+            icon = tinted(R.drawable.ic_wifi, palette.text)) {
             WifiGuardService.reconnectNow(this)
             open(Intent(Settings.ACTION_WIFI_SETTINGS))
         })
+        favoritesRow.addView(tile("Administración", big = true, background = palette.strong, badge = "ADMIN") {
+            open(Intent(this, AdminActivity::class.java))
+        })
     }
+
+    private fun tinted(res: Int, color: Int): Drawable? =
+        getDrawable(res)?.mutate()?.apply { setColorFilter(color, PorterDuff.Mode.SRC_IN) }
 
     private fun addAppTile(row: LinearLayout, name: String, pkg: String, big: Boolean) {
         val icon = runCatching { packageManager.getApplicationIcon(pkg) }.getOrNull() ?: return
@@ -254,7 +261,7 @@ class MainActivity : Activity() {
         big: Boolean,
         background: Int,
         icon: Drawable? = null,
-        label: String? = null,
+        badge: String? = null,
         onClick: () -> Boolean,
     ): View {
         val size = dp(if (big) 78 else 52)
@@ -269,10 +276,7 @@ class MainActivity : Activity() {
             contentDescription = name
         }
         val circle = FrameLayout(this).apply {
-            this.background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(background)
-            }
+            this.background = oval(background)
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: Outline) =
                     outline.setOval(0, 0, view.width, view.height)
@@ -288,12 +292,13 @@ class MainActivity : Activity() {
                 setPadding(pad, pad, pad, pad)
             }, FrameLayout.LayoutParams(-1, -1))
         } else {
-            circle.addView(text(if (big) 22f else 14f, amarillo, bold = true).apply {
-                text = label ?: name
+            val text = badge ?: name
+            circle.addView(label(if (text.length > 4) 15f else 20f, palette.onStrong, bold = true).apply {
+                this.text = text
                 gravity = Gravity.CENTER
             }, FrameLayout.LayoutParams(-1, -1))
         }
-        val caption = text(if (big) 13f else 11f, cafe, bold = true).apply {
+        val caption = label(if (big) 13f else 11f, palette.text, bold = true).apply {
             text = name
             gravity = Gravity.CENTER
             maxLines = 1
@@ -304,7 +309,7 @@ class MainActivity : Activity() {
 
         box.setOnFocusChangeListener { _, focused ->
             val ring = circle.background as GradientDrawable
-            if (focused) ring.setStroke(dp(4), cafe) else ring.setStroke(0, Color.TRANSPARENT)
+            if (focused) ring.setStroke(dp(4), palette.text) else ring.setStroke(0, Color.TRANSPARENT)
             circle.animate().scaleX(if (focused) 1.12f else 1f).scaleY(if (focused) 1.12f else 1f)
                 .setDuration(120).start()
             caption.visibility = if (focused) View.VISIBLE else View.INVISIBLE
@@ -329,22 +334,9 @@ class MainActivity : Activity() {
         addView(content)
     }
 
-    private fun sectionTitle(value: String) = text(16f, cafeMedio, bold = true).apply { text = value }
-
-    private fun text(sizeSp: Float, color: Int, bold: Boolean = false) = TextView(this).apply {
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
-        setTextColor(color)
-        if (bold) typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-    }
-
-    private fun rounded(color: Int, radius: Float) = GradientDrawable().apply {
-        setColor(color)
-        cornerRadius = radius
-    }
+    private fun sectionTitle(value: String) = label(16f, palette.textSoft, bold = true).apply { text = value }
 
     private fun marginTop(value: Int) =
         LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             .apply { topMargin = dp(value) }
-
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

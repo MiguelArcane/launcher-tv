@@ -13,8 +13,8 @@ android {
         // Se queda en 28 a propósito: desde Android 10, las apps que apuntan a 29+
         // ya no pueden apagar/prender el Wi-Fi ni pedir reconexión.
         targetSdk = 28
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     buildTypes {
